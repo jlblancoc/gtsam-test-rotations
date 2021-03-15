@@ -13,14 +13,14 @@ void testRotUncertainty(bool R0_identity) {
   using gtsam::symbol_shorthand::P; // Position
   using gtsam::symbol_shorthand::R; // Rotation
 
-  const double std_large = 1e+2;
+  const double std_large = 1e+3;
   const double std_small = 1e-3;
 
   gtsam::Rot3 R0;
   if (R0_identity)
     R0 = gtsam::Rot3::identity();
   else
-    R0 = gtsam::Rot3::Ypr(deg2rad(0.0), deg2rad(0.0), deg2rad(30.0));
+    R0 = gtsam::Rot3::Ypr(deg2rad(5.0), deg2rad(10.0), deg2rad(20.0));
 
   const auto relRot =
       gtsam::Rot3::Ypr(deg2rad(1.0), deg2rad(2.0), deg2rad(3.0));
@@ -40,13 +40,14 @@ void testRotUncertainty(bool R0_identity) {
       cov(i, i) = (i == axis) ? 1e-6 * std_small : std_large;
 
     // IMPORTANT: GTSAM rot uncertainty is in the TARGET FRAME reference
-    // (Lie group base)
-    // cov = relRot.matrix() * cov * relRot.matrix().transpose();
-    // cov = relRot.matrix().transpose() * cov * relRot.matrix();
+    gtsam::Matrix3 adj = R1.inverse().AdjointMap();
+    std::cout << "adjoint:\n" << adj << "\n";
+    cov = adj.matrix() * cov * adj.matrix().transpose();
 
     gtsam::NonlinearFactorGraph fg;
     fg.emplace_shared<gtsam::BetweenFactor<gtsam::Rot3>>(
-        R(0), R(1), relRot, gtsam::noiseModel::Gaussian::Covariance(cov));
+        R(0), R(1), relRot,
+        gtsam::noiseModel::Gaussian::Covariance(cov, false));
 
     fg.emplace_shared<gtsam::PriorFactor<gtsam::Rot3>>(
         R(0), R0, gtsam::noiseModel::Constrained::All(3));
